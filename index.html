@@ -193,7 +193,7 @@ async function tags(f) {
 }
 
 document.querySelectorAll('[data-ic]').forEach(e => e.innerHTML = ic(e.dataset.ic));
-$('.round').insertAdjacentHTML('beforeend', '<input id="file" type="file" accept="audio/*,video/*" multiple aria-label="Tambah lagu atau video">');
+$('.round').insertAdjacentHTML('beforeend', '<input id="file" type="file" multiple aria-label="Tambah lagu atau video">');
 
 let db, tracks = [], playlists = [], queue = [], cur = -1, url, view = 'all', pl = null, addTo = null, shuffle = false, repeat = false;
 const covers = new Map();
@@ -370,7 +370,14 @@ async function save(f) {
   return meta;
 }
 const sort = () => tracks.sort((a, b) => info(a)[0].localeCompare(info(b)[0]));
-async function addFiles(files) {
+// tanpa atribut accept: iOS sering salah mengenali lagu unduhan dan membuatnya abu-abu, jadi jenis berkas dicek di sini
+const MEDIA = /\.(mp3|m4a|m4b|aac|wav|aiff?|caf|flac|alac|ogg|oga|opus|webm|mp4|m4v|mov)$/i;
+const isMedia = f => /^(audio|video)\//.test(f.type) || MEDIA.test(f.name);
+console.assert(isMedia({type: '', name: 'a.MP3'}) && !isMedia({type: 'application/pdf', name: 'a.pdf'}), 'isMedia');
+async function addFiles(all) {
+  const files = all.filter(isMedia), skip = all.filter(f => !isMedia(f));
+  if (skip.length) alert(`Dilewati karena bukan lagu/video:\n${skip.map(f => f.name).join('\n')}`);
+  if (!files.length) return;
   navigator.storage?.persist?.();
   $('#empty').hidden = false; $('#empty').textContent = `Menyimpan ${files.length} berkas…`;
   for (const f of files) {
