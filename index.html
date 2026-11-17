@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Spotilung">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<title>Spotilung</title>
+<style>
+:root{--navy:#0b1f3a;--gold:#c9a24b;--ink:#0a0a0a;--mute:#6b7280;--line:#ececec}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;padding:env(safe-area-inset-top) 20px calc(96px + env(safe-area-inset-bottom));background:#fff;color:var(--ink);
+  font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;touch-action:manipulation}
+button{font:inherit;border:0;background:none;color:inherit;padding:0;cursor:pointer;user-select:none;-webkit-user-select:none}
+svg{width:24px;height:24px;fill:currentColor;display:block}
+h1,h2{font-family:Didot,"Bodoni 72",Georgia,serif;font-weight:400;margin:0}
+header{display:flex;align-items:center;justify-content:space-between;padding:24px 0 16px}
+h1{font-size:34px;letter-spacing:.5px}
+h1::after{content:"";display:block;width:36px;height:2px;background:var(--gold);margin-top:4px}
+.round{width:44px;height:44px;border-radius:50%;background:var(--navy);color:var(--gold);display:grid;place-items:center;position:relative;cursor:pointer}
+.round input{position:absolute;inset:0;opacity:0;width:100%;height:100%}
+#q{width:100%;border:0;border-radius:12px;background:#f4f4f5;padding:12px 14px;font-size:16px;color:var(--ink);-webkit-appearance:none}
+nav{display:flex;gap:8px;margin:14px 0 8px}
+nav button{padding:8px 18px;border-radius:99px;border:1px solid var(--line);font-size:14px;min-height:40px}
+nav .on{background:var(--navy);border-color:var(--navy);color:#fff}
+#plbar{display:flex;align-items:center;gap:4px;margin:6px 0 4px}
+#plbar[hidden]{display:none}
+#plbar h2{flex:1;min-width:0;font-size:24px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#plbar button{flex:none;width:44px;height:44px;display:grid;place-items:center;color:var(--navy)}
+#back{margin-left:-10px}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;align-items:center;border-bottom:1px solid var(--line)}
+.main{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 0;text-align:left}
+.art{flex:none;width:44px;height:44px;border-radius:8px;overflow:hidden;background:var(--navy);color:var(--gold);display:grid;place-items:center}
+.art img,#cover img{width:100%;height:100%;object-fit:cover;display:block}
+.tx{min-width:0;display:grid}
+.tx b,.tx small,#mt{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tx b{font-weight:500}
+.tx small{color:var(--mute);font-size:13px}
+.cur .art{background:var(--gold);color:var(--navy)}
+.cur b{font-weight:700;color:var(--navy)}
+.fav,.del,.add{flex:none;width:40px;height:44px;display:grid;place-items:center;color:var(--mute)}
+.fav.on{color:var(--gold)}
+#empty{color:var(--mute);text-align:center;padding:56px 16px}
+dialog{border:0;border-radius:16px;padding:20px;width:min(340px,calc(100vw - 32px));color:var(--ink)}
+dialog::backdrop{background:rgba(11,31,58,.55)}
+dialog h2{font-size:22px;margin-bottom:6px}
+#picks button{width:100%;min-height:48px;text-align:left;border-bottom:1px solid var(--line)}
+#picks .new{color:var(--navy);font-weight:600}
+#pickx{margin-top:14px;width:100%;min-height:44px;border-radius:99px;background:var(--navy);color:#fff}
+#mini{position:fixed;left:0;right:0;bottom:0;background:var(--navy);color:#fff;display:flex;align-items:center;
+  padding:8px 12px calc(8px + env(safe-area-inset-bottom)) 20px;border-top:2px solid var(--gold)}
+#mini[hidden]{display:none}
+#mt{flex:1;text-align:left;min-height:48px}
+#mini .b{width:48px;height:48px;display:grid;place-items:center;color:var(--gold)}
+#np{position:fixed;inset:0;background:var(--navy);color:#fff;display:flex;flex-direction:column;
+  padding:calc(12px + env(safe-area-inset-top)) 28px calc(28px + env(safe-area-inset-bottom));
+  transform:translateY(100%);transition:transform .3s ease}
+#np.open{transform:none}
+@media (prefers-reduced-motion:reduce){#np{transition:none}}
+#close{width:48px;height:48px;margin-left:-12px;display:grid;place-items:center}
+#stage{flex:1;min-height:0;display:grid;place-items:center;position:relative}
+#cover{width:min(260px,64vw);aspect-ratio:1;border-radius:16px;overflow:hidden;border:1px solid var(--gold);background:rgba(255,255,255,.05);color:var(--gold);display:grid;place-items:center}
+#cover svg{width:96px;height:96px}
+video{width:100%;max-height:50vh;border-radius:12px;background:#000}
+#np.video #cover{display:none}
+/* audio: elemen video tetap ada (dipakai sebagai pemutar) tapi tak terlihat */
+#np:not(.video) video{position:absolute;width:1px;height:1px;opacity:0}
+#t{font-size:26px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#a{margin:2px 0 18px;color:rgba(255,255,255,.65);min-height:1.4em}
+#seek{width:100%;accent-color:var(--gold);margin:0}
+.times{display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
+.ctl{display:flex;align-items:center;justify-content:space-between;margin-top:18px}
+.ctl button{width:48px;height:48px;display:grid;place-items:center}
+.ctl svg{width:30px;height:30px}
+.ctl .tg{color:rgba(255,255,255,.45)}
+.ctl .tg[aria-pressed=true]{color:var(--gold)}
+#pp{width:68px;height:68px;border-radius:50%;background:var(--gold);color:var(--navy)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Spotilung</h1>
+  <label class="round" data-ic="plus"></label>
+</header>
+<input id="q" type="search" placeholder="Cari judul atau artis" aria-label="Cari">
+<nav>
+  <button data-f="all" class="on">Semua</button>
+  <button data-f="fav">Favorit</button>
+  <button data-f="pl">Playlist</button>
+</nav>
+<div id="plbar" hidden>
+  <button id="back" aria-label="Kembali ke daftar playlist" data-ic="back"></button>
+  <h2 id="pln"></h2>
+  <button id="pldel" aria-label="Hapus playlist" data-ic="trash"></button>
+</div>
+<ul id="list"></ul>
+<p id="empty"></p>
+
+<dialog id="pick">
+  <h2>Tambah ke playlist</h2>
+  <ul id="picks"></ul>
+  <button id="pickx">Batal</button>
+</dialog>
+
+<div id="mini" hidden>
+  <button id="mt" aria-label="Buka pemutar"></button>
+  <button class="b" id="mpp" aria-label="Putar atau jeda"></button>
+  <button class="b" id="mnext" aria-label="Berikutnya" data-ic="next"></button>
+</div>
+
+<section id="np" inert>
+  <button id="close" aria-label="Tutup pemutar" data-ic="down"></button>
+  <div id="stage">
+    <div id="cover"></div>
+    <video id="v" playsinline></video>
+  </div>
+  <h2 id="t"></h2>
+  <p id="a"></p>
+  <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Posisi lagu">
+  <div class="times"><span id="ct">0:00</span><span id="du">0:00</span></div>
+  <div class="ctl">
+    <button class="tg" id="shuf" aria-label="Acak" aria-pressed="false" data-ic="shuffle"></button>
+    <button id="prev" aria-label="Sebelumnya" data-ic="prev"></button>
+    <button id="pp" aria-label="Putar atau jeda"></button>
+    <button id="next" aria-label="Berikutnya" data-ic="next"></button>
+    <button class="tg" id="rep" aria-label="Ulangi semua" aria-pressed="false" data-ic="repeat"></button>
+  </div>
+</section>
+
+<script>
+const P = {
+  play: 'M8 5v14l11-7z', pause: 'M6 5h4v14H6zM14 5h4v14h-4z',
+  next: 'M6 6l8.5 6L6 18zM16 6h2v12h-2z', prev: 'M18 6l-8.5 6L18 18zM6 6h2v12H6z',
+  plus: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z', down: 'M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z',
+  back: 'M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z', minus: 'M19 13H5v-2h14v2z',
+  note: 'M12 3v10.55A4 4 0 1014 17V7h4V3h-6z',
+  video: 'M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z',
+  list: 'M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z',
+  addto: 'M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z',
+  heart: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
+  trash: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+  shuffle: 'M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z',
+  repeat: 'M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z'
+};
+const ic = n => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${P[n]}"/></svg>`;
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const fmt = s => isFinite(s) ? `${s / 60 | 0}:${String(s % 60 | 0).padStart(2, '0')}` : '0:00';
+// "Artis - Judul.mp3" -> [judul, artis]
+const split = n => { const i = n.indexOf(' - '); return i > 0 ? [n.slice(i + 3), n.slice(0, i)] : [n, '']; };
+// tag lagu menang, nama berkas sebagai cadangan
+const info = t => { const [a, b] = split(t.name); return [t.title || a, t.artist || b]; };
+console.assert(split('A - B')[0] === 'B' && split('A - B')[1] === 'A' && split('X')[1] === '' && fmt(125) === '2:05', 'self-check');
+
+// Baca judul, artis, dan cover dari tag ID3v2.3/2.4.
+// shortcut: hanya MP3 (ID3); M4A/FLAC memakai nama berkas, tambahkan parser MP4 jika banyak lagu M4A.
+const syncsafe = (b, i) => b[i] << 21 | b[i + 1] << 14 | b[i + 2] << 7 | b[i + 3];
+const u32 = (b, i) => (b[i] << 24 | b[i + 1] << 16 | b[i + 2] << 8 | b[i + 3]) >>> 0;
+const text = (e, d) => new TextDecoder(['latin1', d[0] === 0xFE ? 'utf-16be' : 'utf-16le', 'utf-16be', 'utf-8'][e] || 'latin1')
+  .decode(d).replace(/\0[\s\S]*$/, '').trim();
+async function tags(f) {
+  const h = new Uint8Array(await f.slice(0, 10).arrayBuffer());
+  // v2.2 dan tag "unsynchronised" jarang dipakai; dilewati
+  if (h.length < 10 || String.fromCharCode(h[0], h[1], h[2]) !== 'ID3' || h[3] < 3 || h[3] > 4 || h[5] & 0x80) return {};
+  const v4 = h[3] === 4, end = 10 + syncsafe(h, 6), b = new Uint8Array(await f.slice(0, end).arrayBuffer()), out = {};
+  let i = 10;
+  if (h[5] & 0x40) i += v4 ? syncsafe(b, 10) : 4 + u32(b, 10);
+  while (i + 10 <= b.length && b[i]) {
+    const id = String.fromCharCode(...b.subarray(i, i + 4)), n = v4 ? syncsafe(b, i + 4) : u32(b, i + 4);
+    const d = b.subarray(i + 10, i + 10 + n);
+    i += 10 + n;
+    if (id === 'TIT2') out.title = text(d[0], d.subarray(1));
+    else if (id === 'TPE1') out.artist = text(d[0], d.subarray(1));
+    else if (id === 'APIC' && !out.cover) {
+      const e = d[0];
+      let j = d.indexOf(0, 1);
+      const mime = text(0, d.subarray(1, j));
+      j += 2; // lewati null dan tipe gambar
+      if (e === 1 || e === 2) { while (j + 1 < d.length && (d[j] || d[j + 1])) j += 2; j += 2; }
+      else { while (j < d.length && d[j]) j++; j++; }
+      if (j < d.length) out.cover = new Blob([d.slice(j)], {type: mime.includes('/') ? mime : 'image/jpeg'});
+    }
+  }
+  for (const k of ['title', 'artist']) if (!out[k]) delete out[k];
+  return out;
+}
+
+document.querySelectorAll('[data-ic]').forEach(e => e.innerHTML = ic(e.dataset.ic));
+$('.round').insertAdjacentHTML('beforeend', '<input id="file" type="file" accept="audio/*,video/*" multiple aria-label="Tambah lagu atau video">');
+
+let db, tracks = [], playlists = [], queue = [], cur = -1, url, view = 'all', pl = null, addTo = null, shuffle = false, repeat = false;
+const covers = new Map();
+const v = $('#v'), np = $('#np'), ms = navigator.mediaSession;
+const req = r => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+const done = t => new Promise((ok, no) => { t.oncomplete = ok; t.onerror = t.onabort = () => no(t.error); });
+const store = (s, m = 'readonly') => db.transaction(s, m).objectStore(s);
+const putPl = p => req(store('playlists', 'readwrite').put(p));
+const now = () => queue[cur];
+const coverUrl = t => t.cover && (covers.get(t.id) || covers.set(t.id, URL.createObjectURL(t.cover)).get(t.id));
+const art = t => t.cover ? `<img src="${coverUrl(t)}" alt="">` : ic(t.video ? 'video' : 'note');
+const visible = () => {
+  const q = $('#q').value.trim().toLowerCase();
+  const base = view === 'fav' ? tracks.filter(t => t.fav) : view === 'pl' ? pl.ids.map(id => tracks.find(t => t.id === id)).filter(Boolean) : tracks;
+  return base.filter(t => `${t.name} ${info(t).join(' ')}`.toLowerCase().includes(q));
+};
+
+function render() {
+  $('#plbar').hidden = !pl;
+  $('#pln').textContent = pl?.name || '';
+  if (view === 'pl' && !pl) {
+    $('#list').innerHTML = `<li data-new><button class="main"><span class="art">${ic('plus')}</span><span class="tx"><b>Playlist baru</b></span></button></li>` +
+      playlists.map(p => `<li data-pl="${p.id}"><button class="main"><span class="art">${ic('list')}</span>
+        <span class="tx"><b>${esc(p.name)}</b><small>${p.ids.length} lagu</small></span></button></li>`).join('');
+    $('#empty').hidden = true;
+    return;
+  }
+  const list = visible(), n = now();
+  $('#list').innerHTML = list.map(t => {
+    const [title, artist] = info(t);
+    return `<li data-id="${t.id}" class="${t === n ? 'cur' : ''}">
+      <button class="main"><span class="art">${art(t)}</span>
+        <span class="tx"><b>${esc(title)}</b><small>${esc([artist, t.video ? 'Video' : 'Audio'].filter(Boolean).join(' · '))}</small></span></button>
+      <button class="add" aria-label="Tambah ${esc(title)} ke playlist">${ic('addto')}</button>
+      <button class="fav ${t.fav ? 'on' : ''}" aria-label="Favorit" aria-pressed="${!!t.fav}">${ic('heart')}</button>
+      ${pl ? `<button class="del" aria-label="Keluarkan ${esc(title)} dari playlist">${ic('minus')}</button>`
+           : `<button class="del" aria-label="Hapus ${esc(title)}">${ic('trash')}</button>`}</li>`;
+  }).join('');
+  $('#empty').hidden = list.length > 0;
+  $('#empty').textContent = !tracks.length ? 'Belum ada lagu. Ketuk + untuk menambahkan lagu atau video dari aplikasi File.'
+    : pl && !pl.ids.length ? 'Playlist ini masih kosong. Ketuk ikon tambah-ke-playlist di lagu mana pun.' : 'Tidak ada hasil.';
+}
+
+async function play(i) {
+  cur = i;
+  const t = now(), [title, artist] = info(t);
+  const blob = await req(store('blobs').get(t.id));
+  URL.revokeObjectURL(url);
+  v.src = url = URL.createObjectURL(blob);
+  // jika iOS menolak autoplay, tombol putar tetap bisa ditekan (ikon mengikuti event play/pause)
+  v.play().catch(() => {});
+  $('#mt').textContent = $('#t').textContent = title;
+  $('#a').textContent = artist;
+  $('#cover').innerHTML = art(t);
+  np.classList.toggle('video', t.video);
+  $('#mini').hidden = false;
+  if (ms) ms.metadata = new MediaMetadata({title, artist,
+    artwork: [t.cover ? {src: coverUrl(t), type: t.cover.type} : {src: 'icon.png', sizes: '512x512', type: 'image/png'}]});
+  render();
+}
+function next(auto) {
+  if (!queue.length) return;
+  let i = shuffle && queue.length > 1 ? (cur + 1 + (Math.random() * (queue.length - 1) | 0)) % queue.length : cur + 1;
+  if (i >= queue.length) { if (auto && !repeat) return; i = 0; }
+  play(i);
+}
+const prev = () => v.currentTime > 3 || cur <= 0 ? v.currentTime = 0 : play(cur - 1);
+const toggle = () => v.paused ? v.play() : v.pause();
+const sheet = open => { np.classList.toggle('open', open); np.inert = !open; };
+const paint = () => $('#pp').innerHTML = $('#mpp').innerHTML = ic(v.paused ? 'play' : 'pause');
+paint();
+
+v.onplay = v.onpause = paint;
+v.onended = () => next(true);
+v.ontimeupdate = v.onloadedmetadata = () => {
+  $('#seek').value = v.duration ? v.currentTime / v.duration * 1000 : 0;
+  $('#ct').textContent = fmt(v.currentTime); $('#du').textContent = fmt(v.duration);
+};
+v.onerror = () => v.getAttribute('src') && alert(`"${now()?.name}" tidak bisa diputar. Format ini tidak didukung iPhone.`);
+$('#seek').oninput = e => { if (v.duration) v.currentTime = e.target.value / 1000 * v.duration; };
+$('#pp').onclick = $('#mpp').onclick = toggle;
+$('#next').onclick = $('#mnext').onclick = () => next();
+$('#prev').onclick = prev;
+$('#mt').onclick = () => sheet(true);
+$('#close').onclick = () => sheet(false);
+$('#shuf').onclick = e => e.currentTarget.setAttribute('aria-pressed', shuffle = !shuffle);
+$('#rep').onclick = e => e.currentTarget.setAttribute('aria-pressed', repeat = !repeat);
+$('#q').oninput = render;
+$('nav').onclick = e => {
+  if (!e.target.dataset.f) return;
+  view = e.target.dataset.f; pl = null;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b === e.target));
+  render();
+};
+$('#back').onclick = () => { pl = null; render(); };
+$('#pldel').onclick = async () => {
+  if (!confirm(`Hapus playlist "${pl.name}"? Lagunya tetap ada di pustaka.`)) return;
+  await req(store('playlists', 'readwrite').delete(pl.id));
+  playlists = playlists.filter(p => p !== pl); pl = null;
+  render();
+};
+if (ms) {
+  ms.setActionHandler('play', () => v.play());
+  ms.setActionHandler('pause', () => v.pause());
+  ms.setActionHandler('previoustrack', prev);
+  ms.setActionHandler('nexttrack', () => next());
+  ms.setActionHandler('seekto', d => v.currentTime = d.seekTime);
+}
+
+async function newPlaylist(ids) {
+  const name = prompt('Nama playlist')?.trim();
+  if (!name) return;
+  const p = {name, ids};
+  p.id = await req(store('playlists', 'readwrite').add(p));
+  playlists.push(p);
+  return p;
+}
+
+$('#list').onclick = async e => {
+  const b = e.target.closest('button'), li = b?.closest('li');
+  if (!b) return;
+  if ('new' in li.dataset) { await newPlaylist([]); return render(); }
+  if (li.dataset.pl) { pl = playlists.find(p => p.id === +li.dataset.pl); $('#q').value = ''; return render(); }
+  const t = tracks.find(t => t.id === +li.dataset.id);
+  if (b.classList.contains('main')) { queue = visible(); play(queue.indexOf(t)); }
+  else if (b.classList.contains('add')) {
+    addTo = t;
+    $('#picks').innerHTML = `<li><button class="new">+ Playlist baru</button></li>` +
+      playlists.map(p => `<li><button data-pl="${p.id}">${esc(p.name)}${p.ids.includes(t.id) ? ' ✓' : ''}</button></li>`).join('');
+    $('#pick').showModal();
+  } else if (b.classList.contains('fav')) {
+    t.fav = !t.fav;
+    await req(store('tracks', 'readwrite').put(t));
+    render();
+  } else if (pl) {
+    pl.ids = pl.ids.filter(id => id !== t.id);
+    await putPl(pl);
+    render();
+  } else if (confirm(`Hapus "${info(t)[0]}" dari Spotilung?`)) {
+    const tx = db.transaction(['tracks', 'blobs', 'playlists'], 'readwrite');
+    tx.objectStore('tracks').delete(t.id); tx.objectStore('blobs').delete(t.id);
+    for (const p of playlists) if (p.ids.includes(t.id)) { p.ids = p.ids.filter(id => id !== t.id); tx.objectStore('playlists').put(p); }
+    await done(tx);
+    URL.revokeObjectURL(covers.get(t.id)); covers.delete(t.id);
+    const n = now();
+    tracks = tracks.filter(x => x !== t);
+    queue = queue.filter(x => x !== t);
+    cur = queue.indexOf(n);
+    if (n === t) { v.pause(); v.removeAttribute('src'); v.load(); $('#mini').hidden = true; sheet(false); }
+    render();
+  }
+};
+
+$('#pickx').onclick = () => $('#pick').close();
+$('#picks').onclick = async e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  $('#pick').close();
+  if (b.classList.contains('new')) await newPlaylist([addTo.id]);
+  else {
+    const p = playlists.find(p => p.id === +b.dataset.pl);
+    if (!p.ids.includes(addTo.id)) { p.ids.push(addTo.id); await putPl(p); }
+  }
+  render();
+};
+
+// metadata dan isi berkas dipisah supaya daftar lagu tidak memuat semua berkas ke memori
+async function save(f) {
+  const video = f.type.startsWith('video/') || /\.(mp4|mov|m4v)$/i.test(f.name);
+  const meta = {name: f.name.replace(/\.[^.]+$/, ''), video, fav: false, ...(video ? {} : await tags(f).catch(() => ({})))};
+  const tx = db.transaction(['tracks', 'blobs'], 'readwrite');
+  tx.objectStore('tracks').add(meta).onsuccess = e => tx.objectStore('blobs').put(f, meta.id = e.target.result);
+  await done(tx);
+  return meta;
+}
+const sort = () => tracks.sort((a, b) => info(a)[0].localeCompare(info(b)[0]));
+async function addFiles(files) {
+  navigator.storage?.persist?.();
+  $('#empty').hidden = false; $('#empty').textContent = `Menyimpan ${files.length} berkas…`;
+  for (const f of files) {
+    try { tracks.push(await save(f)); }
+    catch { alert(`Gagal menyimpan "${f.name}". Penyimpanan iPhone mungkin penuh.`); break; }
+  }
+  sort(); render();
+}
+$('#file').onchange = e => { const f = [...e.target.files]; e.target.value = ''; addFiles(f); };
+
+(async () => {
+  const r = indexedDB.open('spotilung', 2);
+  r.onupgradeneeded = e => {
+    const d = r.result;
+    if (e.oldVersion < 1) { d.createObjectStore('tracks', {keyPath: 'id', autoIncrement: true}); d.createObjectStore('blobs'); }
+    if (e.oldVersion < 2) d.createObjectStore('playlists', {keyPath: 'id', autoIncrement: true});
+  };
+  db = await req(r);
+  [tracks, playlists] = await Promise.all([req(store('tracks').getAll()), req(store('playlists').getAll())]);
+  sort(); render();
+})();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
