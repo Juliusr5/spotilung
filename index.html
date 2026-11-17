@@ -47,6 +47,7 @@ li{display:flex;align-items:center;border-bottom:1px solid var(--line)}
 .fav,.del,.add{flex:none;width:40px;height:44px;display:grid;place-items:center;color:var(--mute)}
 .fav.on{color:var(--gold)}
 #empty{color:var(--mute);text-align:center;padding:56px 16px}
+#ver{color:var(--mute);text-align:center;font-size:12px;margin:24px 0 0}
 dialog{border:0;border-radius:16px;padding:20px;width:min(340px,calc(100vw - 32px));color:var(--ink)}
 dialog::backdrop{background:rgba(11,31,58,.55)}
 dialog h2{font-size:22px;margin-bottom:6px}
@@ -102,6 +103,7 @@ video{width:100%;max-height:50vh;border-radius:12px;background:#000}
 </div>
 <ul id="list"></ul>
 <p id="empty"></p>
+<p id="ver">Spotilung v4</p>
 
 <dialog id="pick">
   <h2>Tambah ke playlist</h2>
@@ -379,11 +381,13 @@ async function addFiles(all) {
   if (skip.length) alert(`Dilewati karena bukan lagu/video:\n${skip.map(f => f.name).join('\n')}`);
   if (!files.length) return;
   navigator.storage?.persist?.();
+  saving = true;
   $('#empty').hidden = false; $('#empty').textContent = `Menyimpan ${files.length} berkas…`;
   for (const f of files) {
     try { tracks.push(await save(f)); }
     catch { alert(`Gagal menyimpan "${f.name}". Penyimpanan iPhone mungkin penuh.`); break; }
   }
+  saving = false;
   sort(); render();
 }
 $('#file').onchange = e => { const f = [...e.target.files]; e.target.value = ''; addFiles(f); };
@@ -399,7 +403,13 @@ $('#file').onchange = e => { const f = [...e.target.files]; e.target.value = '';
   [tracks, playlists] = await Promise.all([req(store('tracks').getAll()), req(store('playlists').getAll())]);
   sort(); render();
 })();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+let saving = false;
+if ('serviceWorker' in navigator) {
+  // versi baru sudah terpasang di latar belakang: muat ulang sekali, kecuali sedang memutar atau menyimpan
+  const had = navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => had && v.paused && !saving && location.reload());
+  navigator.serviceWorker.register('sw.js');
+}
 </script>
 </body>
 </html>
