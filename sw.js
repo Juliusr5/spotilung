@@ -1,5 +1,5 @@
 // Naikkan versi ini setiap kali index.html diubah, supaya iPhone mengambil versi baru.
-const C = 'spotilung-v10';
+const C = 'spotilung-v11';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon.png'];
 // cache: 'reload' melewati cache HTTP browser; tanpa ini versi baru bisa menyimpan index.html lama
 // (GitHub Pages mengizinkan file disimpan sementara sampai 10 menit).
