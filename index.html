@@ -263,7 +263,7 @@ video{width:100%;max-height:50vh;border-radius:12px;background:#000}
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-const VERSION = 'v9';
+const VERSION = 'v10';
 const P = {
   play: 'M8 5v14l11-7z', pause: 'M6 5h4v14H6zM14 5h4v14h-4z',
   next: 'M6 6l8.5 6L6 18zM16 6h2v12h-2z', prev: 'M18 6l-8.5 6L18 18zM6 6h2v12H6z',
@@ -1031,7 +1031,9 @@ if ('serviceWorker' in navigator) {
   // versi baru sudah terpasang di latar belakang: muat ulang sekali, kecuali sedang memutar atau menyimpan
   const had = navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange', () => had && v.paused && !saving && location.reload());
-  navigator.serviceWorker.register('sw.js');
+  const reg = navigator.serviceWorker.register('sw.js');
+  // aplikasi di Layar Utama sering hanya dilanjutkan dari latar belakang (tanpa memuat ulang), jadi cek versi baru di sini
+  document.addEventListener('visibilitychange', () => !document.hidden && reg.then(r => r.update()).catch(() => {}));
 }
 </script>
 </body>
