@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Spotilung">
@@ -18,7 +18,11 @@
 @media (prefers-color-scheme:dark){:root{--bg:#060a12;--fg:#f2f2f2;--mute:#9aa3b2;--line:#1b2333;--field:#121a28;--hi:var(--gold);--chip:#16305a}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;padding:env(safe-area-inset-top) 20px calc(96px + env(safe-area-inset-bottom));background:var(--bg);color:var(--fg);
-  font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;touch-action:manipulation}
+  font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  /* rasa aplikasi asli: tanpa pinch/ketuk-dua-kali zoom, tanpa blok teks saat ditekan lama */
+  touch-action:pan-x pan-y;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%}
+input{-webkit-user-select:text;user-select:text}
+img{-webkit-touch-callout:none;-webkit-user-drag:none}
 button{font:inherit;border:0;background:none;color:inherit;padding:0;cursor:pointer;user-select:none;-webkit-user-select:none}
 button:disabled{opacity:.5}
 svg{width:24px;height:24px;fill:currentColor;display:block}
@@ -87,7 +91,9 @@ dialog h2{font-size:22px;margin-bottom:6px;overflow:hidden;white-space:nowrap;te
 #mini .b{width:48px;height:48px;display:grid;place-items:center;color:var(--gold)}
 #np{position:fixed;inset:0;background:var(--navy);color:#fff;display:flex;flex-direction:column;
   padding:calc(8px + env(safe-area-inset-top)) 28px calc(28px + env(safe-area-inset-bottom));
-  transform:translateY(100%);transition:transform .3s ease}
+  transform:translateY(100%);transition:transform .3s ease;
+  touch-action:none;overscroll-behavior:contain} /* geseran di pemutar tidak menggulir daftar di belakangnya */
+#lyr{touch-action:pan-y}
 #np.open{transform:none}
 @media (prefers-reduced-motion:reduce){#np{transition:none}}
 .top{display:flex;align-items:center;margin:0 -12px}
@@ -257,7 +263,7 @@ video{width:100%;max-height:50vh;border-radius:12px;background:#000}
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-const VERSION = 'v8';
+const VERSION = 'v9';
 const P = {
   play: 'M8 5v14l11-7z', pause: 'M6 5h4v14H6zM14 5h4v14h-4z',
   next: 'M6 6l8.5 6L6 18zM16 6h2v12h-2z', prev: 'M18 6l-8.5 6L18 18zM6 6h2v12H6z',
@@ -385,6 +391,9 @@ function parseLrc(s) {
 }
 console.assert(parseLrc('[ar:X]\n[00:03.00][00:05]b\n[00:01.50]a').map(l => l.s + l.t).join() === 'a1.5,b3,b5'
   && parseLrc('baris satu\n\nbaris dua').length === 2, 'lrc self-check');
+
+// Safari iOS mengabaikan user-scalable=no; event gesture khusus WebKit ini yang benar-benar menahan pinch zoom
+for (const g of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(g, e => e.preventDefault(), {passive: false});
 
 // ---------- State ----------
 document.querySelectorAll('[data-ic]').forEach(e => e.innerHTML = ic(e.dataset.ic));
