@@ -78,7 +78,8 @@ dialog h2{font-size:22px;margin-bottom:6px;overflow:hidden;white-space:nowrap;te
 .row2 button{flex:1;min-height:44px;border-radius:99px;border:1px solid var(--line)}
 .row2 .pri{background:var(--chip);border-color:var(--chip);color:#fff}
 #toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--fg);color:var(--bg);
-  padding:10px 16px;border-radius:99px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+  padding:10px 16px;border-radius:18px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;
+  width:max-content;max-width:calc(100vw - 32px);text-align:center}
 #toast.on{opacity:1}
 #mini{position:fixed;left:0;right:0;bottom:0;background:var(--navy);color:#fff;display:flex;align-items:center;
   padding:8px 12px calc(8px + env(safe-area-inset-bottom)) 20px;border-top:2px solid var(--gold)}
@@ -109,7 +110,12 @@ video{width:100%;max-height:50vh;border-radius:12px;background:#000}
 #lyroff{position:absolute;left:50%;bottom:0;transform:translateX(-50%);display:flex;align-items:center;gap:2px;
   background:rgba(255,255,255,.1);border-radius:99px;padding:2px;font-size:13px;white-space:nowrap}
 #np:not(.lyr) #lyroff{display:none}
-#lyroff button{width:44px;height:36px;font-size:22px;line-height:1;color:var(--gold)}
+#lyroff button{width:40px;height:36px;font-size:22px;line-height:1;color:var(--gold)}
+#lyroff .t{width:auto;padding:0 12px;font-size:13px;font-weight:600;border-radius:99px}
+#lyrsync{background:rgba(201,162,75,.18)}
+#lyroff.syncing .n,#lyroff:not(.syncing) .s{display:none}
+#lyroff.syncing #lyrv{padding:0 6px 0 12px}
+#np.lyr #lyr p{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
 #np.lyr #cover{visibility:hidden}
 #lyr p{margin:0 0 16px;font-size:22px;font-weight:650;line-height:1.3;color:rgba(255,255,255,.35);transition:color .25s;cursor:pointer}
 #lyr p.on,#lyr.plain p{color:#fff}
@@ -229,9 +235,11 @@ video{width:100%;max-height:50vh;border-radius:12px;background:#000}
     <video id="v" playsinline></video>
     <div id="lyr"></div>
     <div id="lyroff" hidden>
-      <button id="lyrm" aria-label="Majukan lirik 0,5 detik">−</button>
+      <button id="lyrm" class="n" aria-label="Majukan bagian lirik ini 0,5 detik">−</button>
       <span id="lyrv" aria-live="polite"></span>
-      <button id="lyrp" aria-label="Mundurkan lirik 0,5 detik">+</button>
+      <button id="lyrp" class="n" aria-label="Mundurkan bagian lirik ini 0,5 detik">+</button>
+      <button id="lyrreset" class="t s">Atur ulang</button>
+      <button id="lyrsync" class="t"></button>
     </div>
   </div>
   <h2 id="t"></h2>
@@ -249,7 +257,7 @@ video{width:100%;max-height:50vh;border-radius:12px;background:#000}
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-const VERSION = 'v7';
+const VERSION = 'v8';
 const P = {
   play: 'M8 5v14l11-7z', pause: 'M6 5h4v14H6zM14 5h4v14h-4z',
   next: 'M6 6l8.5 6L6 18zM16 6h2v12h-2z', prev: 'M18 6l-8.5 6L18 18zM6 6h2v12H6z',
@@ -644,7 +652,7 @@ async function showLyrics() {
     try {
       const dur = await duration(), l = await fetchLyrics(...info(t), dur);
       t.lyricsTried = true;
-      if (l && l !== t.lyrics) { t.lyrics = l; delete t.lyrOffset; }
+      if (l && l !== t.lyrics) { t.lyrics = l; clearSync(t); }
       if (t.lyrics) t.lyricsDur = dur || 0;
       if (tracks.includes(t)) await put(t);
     } catch {}
@@ -657,31 +665,55 @@ async function showLyrics() {
     : `<p class="hint">${t.lyricsTried ? 'Lirik tidak ditemukan.' : 'Lirik belum tersimpan. Buka panel ini saat online untuk mencari otomatis.'}<br>Bisa juga ditambahkan lewat ⋮ → Edit info.</p>`;
   box.scrollTop = 0;
   $('#lyroff').hidden = lines[0]?.t == null;
-  paintOff(); syncLyrics();
+  syncMode = false;
+  calcEff(); paintOff(); syncLyrics();
 }
-// geser waktu lirik per lagu, untuk lirik yang tetap meleset (mis. versi video klip dengan intro berbeda)
-const offset = () => now()?.lyrOffset || 0;
-const paintOff = () => {
-  const o = offset();
-  $('#lyrv').textContent = o ? `Lirik ${o > 0 ? '+' : '−'}${String(Math.abs(o)).replace('.', ',')} dtk` : 'Lirik telat? Tekan −';
-};
-function shiftLyrics(d) {
+// Sinkron lirik per lagu. Video klip sering punya adegan tanpa lagu (intro, jeda di tengah), jadi satu geseran
+// untuk seluruh lagu tidak cukup: tiap titik sinkron {i, off} menggeser baris i dan semua baris sesudahnya.
+let eff = [], syncMode = false;
+const anchors = t => t?.lyrSync || (t?.lyrOffset ? [{i: 0, off: t.lyrOffset}] : []); // lyrOffset: format v7
+const effTimes = (ls, a) => { let k = -1; return ls.map((l, j) => { while (k + 1 < a.length && a[k + 1].i <= j) k++; return l.t + (k >= 0 ? a[k].off : 0); }); };
+console.assert(effTimes([{t: 1}, {t: 2}, {t: 3}, {t: 4}], [{i: 0, off: -1}, {i: 2, off: 5}]).join() === '0,1,8,9', 'effTimes');
+const calcEff = () => { eff = effTimes(lines, anchors(now())); };
+const segment = () => anchors(now()).filter(a => a.i <= Math.max(lineI, 0)).pop();
+function paintOff() {
+  $('#lyroff').classList.toggle('syncing', syncMode);
+  $('#lyrsync').textContent = syncMode ? 'Selesai' : 'Sinkron';
+  const o = segment()?.off || 0;
+  $('#lyrv').textContent = syncMode ? 'Mode sinkron'
+    : o ? `Lirik ${o > 0 ? '+' : '−'}${String(Math.abs(o)).replace('.', ',')} dtk` : anchors(now()).length ? 'Lirik pas' : 'Belum pas? Ketuk Sinkron';
+}
+function setAnchors(list) {
   const t = now();
-  if (!t) return;
-  t.lyrOffset = Math.round((offset() + d) * 10) / 10;
-  if (!t.lyrOffset) delete t.lyrOffset;
-  put(t); paintOff(); lineI = -2; syncLyrics();
+  delete t.lyrOffset;
+  if (list.length) t.lyrSync = list.sort((a, b) => a.i - b.i); else delete t.lyrSync;
+  put(t); calcEff(); lineI = -2; syncLyrics(); paintOff();
+}
+const clearSync = t => { delete t.lyrOffset; delete t.lyrSync; };
+// − / + menggeser bagian lirik yang sedang aktif saja
+function shiftLyrics(d) {
+  const a = anchors(now()).map(x => ({...x}));
+  let seg = a.filter(x => x.i <= Math.max(lineI, 0)).pop();
+  if (!seg) a.push(seg = {i: 0, off: 0});
+  seg.off = Math.round((seg.off + d) * 10) / 10;
+  setAnchors(a.filter(x => x.i || x.off));
 }
 $('#lyrm').onclick = () => shiftLyrics(-0.5);
 $('#lyrp').onclick = () => shiftLyrics(0.5);
-console.assert(Math.round((0.1 + 0.2) * 10) / 10 === 0.3, 'offset rounding');
+$('#lyrsync').onclick = () => {
+  syncMode = !syncMode;
+  paintOff();
+  if (syncMode) toast('Ketuk tiap baris tepat saat mulai dinyanyikan. Cukup baris pertama dan baris pertama setelah jeda.');
+};
+$('#lyrreset').onclick = () => { setAnchors([]); toast('Sinkron lirik diatur ulang'); };
 function syncLyrics() {
   if (!lyrOn || !lines.length || lines[0].t == null) return;
-  const at = v.currentTime - offset(), i = lines.findLastIndex(l => l.t <= at + 0.25);
+  const i = eff.findLastIndex(e => e <= v.currentTime + 0.25);
   if (i === lineI) return;
-  const box = $('#lyr');
+  const box = $('#lyr'), seg = segment();
   box.querySelector('.on')?.classList.remove('on');
   lineI = i;
+  if (segment() !== seg) paintOff(); // label ikut bagian lirik yang sedang aktif
   const el = box.children[i];
   if (!el) return;
   el.classList.add('on');
@@ -690,13 +722,18 @@ function syncLyrics() {
 }
 function toggleLyrics() {
   lyrOn = !lyrOn;
+  syncMode = false;
   np.classList.toggle('lyr', lyrOn);
   $('#lyrb').setAttribute('aria-pressed', lyrOn);
   if (lyrOn) showLyrics();
 }
 $('#lyr').onclick = e => {
-  const l = lines[e.target.closest('p[data-i]')?.dataset.i];
-  if (l?.t != null) { v.currentTime = Math.max(0, l.t + offset()); lineI = -2; syncLyrics(); }
+  const j = +e.target.closest('p[data-i]')?.dataset.i;
+  if (!(j >= 0) || lines[j].t == null) return;
+  if (syncMode) {
+    setAnchors([...anchors(now()).filter(a => a.i !== j), {i: j, off: Math.round((v.currentTime - lines[j].t) * 10) / 10}]);
+    toast(`Baris ${j + 1} disinkronkan`);
+  } else { v.currentTime = Math.max(0, eff[j]); lineI = -2; syncLyrics(); }
 };
 
 // ---------- Tombol & menu ----------
@@ -874,7 +911,7 @@ $('#eds').onclick = async () => {
   const {t} = draft;
   for (const [k, id] of [['title', '#edt'], ['artist', '#eda'], ['album', '#edal']]) { const x = $(id).value.trim(); if (x) t[k] = x; else delete t[k]; }
   if (draft.cover !== (t.cover || null)) { dropCover(t); if (draft.cover) t.cover = draft.cover; else delete t.cover; }
-  if (draft.lyrics !== (t.lyrics || null)) { if (draft.lyrics) t.lyrics = draft.lyrics; else delete t.lyrics; t.lyricsOwn = true; delete t.lyrOffset; }
+  if (draft.lyrics !== (t.lyrics || null)) { if (draft.lyrics) t.lyrics = draft.lyrics; else delete t.lyrics; t.lyricsOwn = true; clearSync(t); }
   t.coverTried = t.albumTried = t.lyricsTried = true; // pilihan manual tidak ditimpa pencarian otomatis
   await put(t);
   $('#ed').close();
@@ -952,7 +989,7 @@ async function addFiles(all) {
   const orphan = [];
   for (const f of lrc) {
     const t = tracks.find(t => t.name === baseName(f));
-    if (t) { t.lyrics = await f.text(); t.lyricsTried = t.lyricsOwn = true; delete t.lyrOffset; await put(t); } else orphan.push(f.name);
+    if (t) { t.lyrics = await f.text(); t.lyricsTried = t.lyricsOwn = true; clearSync(t); await put(t); } else orphan.push(f.name);
   }
   if (orphan.length) notes.push(`Lirik tanpa lagu dengan nama sama:\n${orphan.join('\n')}`);
   saving = false;
