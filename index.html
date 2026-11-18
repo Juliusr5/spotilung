@@ -74,7 +74,10 @@ video{width:100%;max-height:50vh;border-radius:12px;background:#000}
 #np:not(.video) video{position:absolute;width:1px;height:1px;opacity:0}
 #t{font-size:26px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #a{margin:2px 0 18px;color:rgba(255,255,255,.65);min-height:1.4em}
-#seek{width:100%;accent-color:var(--gold);margin:0}
+#seek{-webkit-appearance:none;appearance:none;width:100%;height:32px;margin:0;background:none;--p:0%}
+#seek::-webkit-slider-runnable-track{height:4px;border-radius:2px;
+  background:linear-gradient(var(--gold),var(--gold)) 0/var(--p) 100% no-repeat,rgba(255,255,255,.2)}
+#seek::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-7px;border-radius:50%;background:var(--gold);border:0}
 .times{display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
 .ctl{display:flex;align-items:center;justify-content:space-between;margin-top:18px}
 .ctl button{width:48px;height:48px;display:grid;place-items:center}
@@ -103,7 +106,7 @@ video{width:100%;max-height:50vh;border-radius:12px;background:#000}
 </div>
 <ul id="list"></ul>
 <p id="empty"></p>
-<p id="ver">Spotilung v4</p>
+<p id="ver">Spotilung v5</p>
 
 <dialog id="pick">
   <h2>Tambah ke playlist</h2>
@@ -268,14 +271,24 @@ const sheet = open => { np.classList.toggle('open', open); np.inert = !open; };
 const paint = () => $('#pp').innerHTML = $('#mpp').innerHTML = ic(v.paused ? 'play' : 'pause');
 paint();
 
-v.onplay = v.onpause = paint;
-v.onended = () => next(true);
-v.ontimeupdate = v.onloadedmetadata = () => {
-  $('#seek').value = v.duration ? v.currentTime / v.duration * 1000 : 0;
-  $('#ct').textContent = fmt(v.currentTime); $('#du').textContent = fmt(v.duration);
+// Slider digerakkan tiap frame (iOS hanya mengirim timeupdate ~4x per detik, itu yang membuatnya patah-patah)
+// dan tidak "dilawan" posisi lagu saat sedang digeser jari.
+const seek = $('#seek');
+let dragging = false;
+const showPos = s => {
+  if (!dragging) seek.value = v.duration ? s / v.duration * 1000 : 0;
+  seek.style.setProperty('--p', seek.value / 10 + '%');
+  $('#ct').textContent = fmt(s);
 };
+const tick = () => { if (!dragging) showPos(v.currentTime); if (!v.paused) requestAnimationFrame(tick); };
+v.onplay = () => { paint(); tick(); };
+v.onpause = paint;
+v.onended = () => next(true);
+v.ontimeupdate = () => v.paused && showPos(v.currentTime); // saat jeda (mis. digeser dari layar kunci)
+v.onloadedmetadata = () => { $('#du').textContent = fmt(v.duration); showPos(v.currentTime); };
+seek.oninput = () => { dragging = true; showPos(seek.value / 1000 * v.duration || 0); };
+seek.onchange = () => { if (v.duration) v.currentTime = seek.value / 1000 * v.duration; dragging = false; };
 v.onerror = () => v.getAttribute('src') && alert(`"${now()?.name}" tidak bisa diputar. Format ini tidak didukung iPhone.`);
-$('#seek').oninput = e => { if (v.duration) v.currentTime = e.target.value / 1000 * v.duration; };
 $('#pp').onclick = $('#mpp').onclick = toggle;
 $('#next').onclick = $('#mnext').onclick = () => next();
 $('#prev').onclick = prev;
@@ -371,6 +384,43 @@ async function save(f) {
   await done(tx);
   return meta;
 }
+// Cover otomatis dari iTunes Search API (gratis, tanpa kunci). Yang dikirim ke Apple hanya judul + artis, bukan lagunya.
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[^\p{L}\p{N}]/gu, '');
+const clean = s => s.replace(/[([].*?[)\]]/g, '').trim(); // buang "(Official Video)", "[Lirik]", dst.
+async function findCover(t) {
+  const [title, artist] = info(t).map(clean);
+  const r = await fetch(`https://itunes.apple.com/search?entity=song&limit=5&term=${encodeURIComponent(`${artist} ${title}`.trim())}`);
+  if (!r.ok) throw new Error(r.status);
+  // hanya terima hasil yang judulnya cocok, supaya tidak memasang cover lagu lain
+  const nt = norm(title), hit = (await r.json()).results.find(x => {
+    const n = norm(x.trackName || '');
+    return nt && n && (n.includes(nt) || nt.includes(n));
+  });
+  if (!hit?.artworkUrl100) return null;
+  const img = await fetch(hit.artworkUrl100.replace('100x100bb', '600x600bb'));
+  if (!img.ok) throw new Error(img.status);
+  return img.blob();
+}
+console.assert(norm('Café Del-Mar!') === 'cafedelmar' && clean('Yellow (Official Video)') === 'Yellow', 'cover self-check');
+let hunting = false;
+async function autoCovers() {
+  if (hunting || !navigator.onLine) return;
+  hunting = true;
+  for (const t of tracks.filter(t => !t.cover && !t.video && !t.coverTried)) {
+    try {
+      const blob = await findCover(t);
+      if (!tracks.includes(t)) continue; // dihapus saat sedang dicari
+      t.coverTried = true;
+      if (blob) t.cover = blob;
+      await req(store('tracks', 'readwrite').put(t));
+      if (blob) { render(); if (t === now()) $('#cover').innerHTML = art(t); }
+    } catch { break; } // jaringan bermasalah: dicoba lagi saat online atau aplikasi dibuka lagi
+    await new Promise(r => setTimeout(r, 3000)); // batas iTunes sekitar 20 permintaan per menit
+  }
+  hunting = false;
+}
+addEventListener('online', autoCovers);
+
 const sort = () => tracks.sort((a, b) => info(a)[0].localeCompare(info(b)[0]));
 // tanpa atribut accept: iOS sering salah mengenali lagu unduhan dan membuatnya abu-abu, jadi jenis berkas dicek di sini
 const MEDIA = /\.(mp3|m4a|m4b|aac|wav|aiff?|caf|flac|alac|ogg|oga|opus|webm|mp4|m4v|mov)$/i;
@@ -388,7 +438,7 @@ async function addFiles(all) {
     catch { alert(`Gagal menyimpan "${f.name}". Penyimpanan iPhone mungkin penuh.`); break; }
   }
   saving = false;
-  sort(); render();
+  sort(); render(); autoCovers();
 }
 $('#file').onchange = e => { const f = [...e.target.files]; e.target.value = ''; addFiles(f); };
 
@@ -401,7 +451,7 @@ $('#file').onchange = e => { const f = [...e.target.files]; e.target.value = '';
   };
   db = await req(r);
   [tracks, playlists] = await Promise.all([req(store('tracks').getAll()), req(store('playlists').getAll())]);
-  sort(); render();
+  sort(); render(); autoCovers();
 })();
 let saving = false;
 if ('serviceWorker' in navigator) {
