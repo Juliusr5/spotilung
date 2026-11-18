@@ -1,5 +1,5 @@
 // Naikkan versi ini setiap kali index.html diubah, supaya iPhone mengambil versi baru.
-const C = 'spotilung-v6';
+const C = 'spotilung-v7';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(
